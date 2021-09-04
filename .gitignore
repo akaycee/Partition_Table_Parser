@@ -1,0 +1,6 @@
+*.o
+*.img
+2021-05-07-raspios-buster-armhf-lite/
+parse_partition_table
+*.swp
+

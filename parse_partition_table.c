@@ -9,7 +9,7 @@
  * https://en.wikipedia.org/wiki/Master_boot_record */
 
 #define BLK_SIZE		512	/* Default value */
-#define MAX_PTABLE_RECORDS	4	/* Max partition table entries */
+#define MAX_partition_table_RECORDS	4	/* Max partition table entries */
 #define MAX_ETABLE_RECORDS	2	/* Max extended table entries */
 
 struct disk_tstamp {
@@ -20,7 +20,7 @@ struct disk_tstamp {
 	uint8_t hours;		/* Hours (0–23) */
 };
 
-struct partition_table {
+struct partition_entry {
 	uint8_t status;		/* Status or physical drive */
 	uint8_t chs_1[3];	/* CHS address of first absolute sector in partition */
 	uint8_t part_type;	/* specifies the file system the partition contains */
@@ -40,7 +40,7 @@ struct bootstrap_code_area {
 
 struct mbr {
 	struct bootstrap_code_area bc;		/* Bootstrap Code area */
-	struct partition_table ptable[4];	/* Partition table (for primary partitions) */
+	struct partition_entry partition_table[4];	/* Partition table (for primary partitions) */
 	uint16_t b_sign;			/* Boot Signature (0x55AA) */
 };
 #pragma pack()
@@ -96,8 +96,8 @@ void print_overview (struct mbr record, char *filename)
 	char size_in_bytes[64];
 	int i = 0;
 
-	total_sectors = record.ptable[0].lba_as;				/* Initialise total_sector with the first absolute sector */
-	for (i = 0; i < 4; ++i) total_sectors +=  record.ptable[i].no_sectors;
+	total_sectors = record.partition_table[0].lba_as;				/* Initialise total_sector with the first absolute sector */
+	for (i = 0; i < 4; ++i) total_sectors +=  record.partition_table[i].no_sectors;
 	total_bytes = total_sectors * BLK_SIZE;
 	sh_bytes(total_bytes, size_in_bytes);
 
@@ -114,15 +114,15 @@ int print_part_entries(struct mbr record, char *filename, long long *ext_table)
 	*ext_table = 0;
 	
 	for (i = 0; i < max_record; ++i) {
-		sectors = record.ptable[i].no_sectors;
+		sectors = record.partition_table[i].no_sectors;
 		
 		if (0 == sectors)
 			continue;
 		
-		start = record.ptable[i].lba_as;
+		start = record.partition_table[i].lba_as;
 		end = start + sectors - 1;
 		total_sectors += sectors;
-		type = record.ptable[i].part_type;
+		type = record.partition_table[i].part_type;
 		
 		if (is_extended(type)) {
 			*ext_table = (start * BLK_SIZE);
@@ -131,7 +131,7 @@ int print_part_entries(struct mbr record, char *filename, long long *ext_table)
 		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
 
 		printf("%s%d  ", filename, i + 1);
-		printf("%c\t", record.ptable[i].status? '*':' ' );
+		printf("%c\t", record.partition_table[i].status? '*':' ' );
 		printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
 		printf("%s\t", size_in_bytes);
 		printf("%0x\t%s\n", type, part_type_to_string(type));

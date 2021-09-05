@@ -296,15 +296,23 @@ char* part_type_to_string(int type)
 int is_extended(int type)
 {
 	switch (type) {
-	case 0xD5 : 
-	case 0x05 : 
-	case 0x0F : 
-	case 0x22 : 
-	case 0xCF : 
-	case 0xE1 : 
-	case 0xE4 :
-	       return 1;
-	default:
-		return 0;
-	}		
+		case 0xD5 : 
+		case 0x05 : 
+		case 0x0F : 
+		case 0x22 : 
+		case 0xCF : 
+		case 0xE1 : 
+		case 0xE4 :
+		       return 1;
+		default:
+			return 0;
+	}
+}
+
+int is_gpt(int type)
+{
+	if (type == 0xEE)
+		return 1;
+
+	return 0;
 }

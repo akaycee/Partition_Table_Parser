@@ -9,7 +9,7 @@
  * https://en.wikipedia.org/wiki/Master_boot_record */
 
 #define BLK_SIZE		512	/* Default value */
-#define MAX_PTABLE_RECORDS	4	/* Max partition table entries */
+#define MAX_partition_table_RECORDS	4	/* Max partition table entries */
 #define MAX_ETABLE_RECORDS	2	/* Max extended table entries */
 
 struct disk_tstamp {
@@ -20,7 +20,7 @@ struct disk_tstamp {
 	uint8_t hours;		/* Hours (0–23) */
 };
 
-struct partition_table {
+struct partition_entry {
 	uint8_t status;		/* Status or physical drive */
 	uint8_t chs_1[3];	/* CHS address of first absolute sector in partition */
 	uint8_t part_type;	/* specifies the file system the partition contains */
@@ -40,7 +40,7 @@ struct bootstrap_code_area {
 
 struct mbr {
 	struct bootstrap_code_area bc;		/* Bootstrap Code area */
-	struct partition_table ptable[4];	/* Partition table (for primary partitions) */
+	struct partition_entry partition_table[4];	/* Partition table (for primary partitions) */
 	uint16_t b_sign;			/* Boot Signature (0x55AA) */
 };
 #pragma pack()
@@ -80,96 +80,7 @@ void sh_bytes (long long t_bytes, char *bytes)
 	sprintf(bytes, "%.3g%cB", total_bytes, size);
 }
 
-/* print_overview - Prints the number of sectors and total no. of bytes
- *
- * Parameters:
- * 1) struct mbr 	<INPUT> : Master Boot Record Structure
- * 2) char *filename	<INPUT> : Name of the img file
- * 
- * Return: void
- */
-
-void print_overview (struct mbr record, char *filename)
-{
-	long total_sectors = 0;
-	long long total_bytes = 0;
-	char size_in_bytes[64];
-	int i = 0;
-
-	total_sectors = record.ptable[0].lba_as;				/* Initialise total_sector with the first absolute sector */
-	for (i = 0; i < 4; ++i) total_sectors +=  record.ptable[i].no_sectors;
-	total_bytes = total_sectors * BLK_SIZE;
-	sh_bytes(total_bytes, size_in_bytes);
-
-	printf("Disk %s: %s, %llu bytes, %lu sectors\n", filename, size_in_bytes, total_bytes, total_sectors);
-	printf("Disk identifier: 0x%0x\n", record.bc.dsign);
-}
-
-int print_part_entries(struct mbr record, char *filename, long long *ext_table)
-{
-	char size_in_bytes[64];
-	long total_sectors = 0, start = 0, end = 0, sectors = 0;
-	int i = 0, type = 0, max_record = (*ext_table ? 2 : 4);
-	
-	*ext_table = 0;
-	
-	for (i = 0; i < max_record; ++i) {
-		sectors = record.ptable[i].no_sectors;
-		
-		if (0 == sectors)
-			continue;
-		
-		start = record.ptable[i].lba_as;
-		end = start + sectors - 1;
-		total_sectors += sectors;
-		type = record.ptable[i].part_type;
-		
-		if (is_extended(type)) {
-			*ext_table = (start * BLK_SIZE);
-		}
-
-		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
-
-		printf("%s%d  ", filename, i + 1);
-		printf("%c\t", record.ptable[i].status? '*':' ' );
-		printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
-		printf("%s\t", size_in_bytes);
-		printf("%0x\t%s\n", type, part_type_to_string(type));
-	}
-}
-
-/* print_part_table - Prints the Partition table from the master boot record
- *
- * Parameters:
- * 1) struct mbr record	<INPUT>	: The master boot record with the partition table
- * 2) char *filename	<INPUT> : The name of the img file
- *
- * Return: void
- */
-
-void print_part_table (struct mbr record, char *filename)
-{
-	long long ext_table = 0;
-	int size = 0;
-	
-	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
-
-	print_part_entries(record, filename, &ext_table);
-	
-	while (ext_table) {
-		if ((size = fseek(img, ext_table, SEEK_SET)) < 0) {
-			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
-			return;
-		} else if ((size = fread(&record, 1, sizeof(struct mbr), img)) < 1) {
-			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
-			return;
-		}
-		print_part_entries(record, filename, &ext_table);
-	}
-
-}
-
-/* get_mbr - Get the master boot record from the img file
+/* read_mbr - Get the master boot record from the img file
  *
  * Parameters:
  * 1) char *filename	<INPUT> : The name of the img file
@@ -178,7 +89,7 @@ void print_part_table (struct mbr record, char *filename)
  * Return: -1 if there is an error, 0 otherwise.
  */
 
-int get_mbr(char *filename, struct mbr *record)
+int read_mbr(char *filename, struct mbr *record)
 {
 	unsigned int size = 0;
 	
@@ -195,6 +106,177 @@ int get_mbr(char *filename, struct mbr *record)
 
 }
 
+int is_gpt_disk(struct mbr record)
+{
+	int part_type = record.partition_table[0].part_type;
+
+	if (is_gpt(part_type))
+		return 1;
+
+	return 0;
+}
+
+/* print_overview - Prints the number of sectors and total no. of bytes
+ *
+ * Parameters:
+ * 1) struct mbr 	<INPUT> : Master Boot Record Structure
+ * 2) char *filename	<INPUT> : Name of the img file
+ * 
+ * Return: void
+ */
+
+void print_overview (struct mbr record, char *filename)
+{
+	long total_sectors = 0;
+	long long total_bytes = 0;
+	char size_in_bytes[64];
+	int i = 0;
+
+	total_sectors = record.partition_table[0].lba_as;				/* Initialise total_sector with the first absolute sector */
+	for (i = 0; i < 4; ++i) total_sectors +=  record.partition_table[i].no_sectors;
+	total_bytes = total_sectors * BLK_SIZE;
+	sh_bytes(total_bytes, size_in_bytes);
+
+	printf("Disk %s: %s, %llu bytes, %lu sectors\n", filename, size_in_bytes, total_bytes, total_sectors);
+	printf("Disk identifier: 0x%0x\n", record.bc.dsign);
+}
+
+/* print_ebr_table - Prints the partition info of one EBR
+ *
+ * Parameters:
+ * 1) struct mbr 		<INPUT>  : Master Boot Record structure
+ * 2) char *filename		<INPUT>  : Name of the img file
+ * 3) long long *ebr_address	<OUTPUT> : The relative address of the next EBR if it exists, 0 otherwise
+ * 4) int partition_number	<INPUT> : The number of the next partition
+ * 
+ * Return: void
+ */
+
+void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset, int partition_number)
+{
+	char size_in_bytes[64];
+	long total_sectors = 0, start = 0, end = 0, sectors = 0;
+	int type = 0;
+
+	sectors = record.partition_table[0].no_sectors;
+	
+	// Print the info of the logical partition
+	if (0 != sectors)
+	{
+		start = record.partition_table[0].lba_as;
+		end = start + sectors - 1;
+		total_sectors += sectors;
+		type = record.partition_table[0].part_type;
+
+		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
+
+		printf("%s%d  ", filename, partition_number);
+		printf("%c\t", record.partition_table[0].status? '*':' ' );
+		printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
+		printf("%s\t", size_in_bytes);
+		printf("%0x\t%s\n", type, part_type_to_string(type));
+	}
+
+	// Store the offset of the next EBR
+	if (record.partition_table[1].no_sectors == 0)
+		*ebr_offset = 0;
+	else
+		*ebr_offset = record.partition_table[1].lba_as * BLK_SIZE;
+}
+
+/* print_extended_partitions - Prints the partition info all EBR partitions on the disk
+ *
+ * Parameters:
+ * 1) struct mbr 		<INPUT> : Master Boot Record structure
+ * 2) char *filename		<INPUT> : Name of the img file
+ * 3) long long ebr_address	<INPUT> : The absolute address of the first EBR table
+ * 4) int partition_number	<INPUT> : The number of the next partition
+ * 
+ * Return: void
+ */
+
+void print_extended_partitions(struct mbr record, char *filename, long long ebr_address, int partition_number)
+{
+	unsigned int size = 0;
+	long long ebr_offset = 0;
+
+	do
+	{
+		if ((size = fseek(img, ebr_address + ebr_offset, SEEK_SET)) < 0) {
+			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+			return;
+		} else if ((size = fread(&record, 1, sizeof(struct mbr), img)) < 1) {
+			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+			return;
+		}
+
+		print_ebr_table(record, filename, &ebr_offset, partition_number);
+		partition_number += 1;
+	} while (ebr_offset);
+}
+
+/* print_mbr_table - Prints the partition info of an MBR
+ *
+ * Parameters:
+ * 1) struct mbr 		<INPUT>  : Master Boot Record structure
+ * 2) char *filename		<INPUT>  : Name of the img file
+ * 
+ * Return: void
+ */
+
+void print_mbr_table(struct mbr record, char *filename)
+{
+	char size_in_bytes[64];
+	long total_sectors = 0, start = 0, end = 0, sectors = 0;
+	int i, type = 0;
+	long long ebr_address = 0;
+
+	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
+	
+	for (i = 0; i < 4; ++i) {
+		sectors = record.partition_table[i].no_sectors;
+		
+		if (0 == sectors)
+			continue;
+		
+		start = record.partition_table[i].lba_as;
+		end = start + sectors - 1;
+		total_sectors += sectors;
+		type = record.partition_table[i].part_type;
+		
+		if (is_extended(type))
+			ebr_address = (start * BLK_SIZE);
+
+		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
+
+		printf("%s%d  ", filename, i + 1);
+		printf("%c\t", record.partition_table[i].status? '*':' ' );
+		printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
+		printf("%s\t", size_in_bytes);
+		printf("%0x\t%s\n", type, part_type_to_string(type));
+	}
+
+	if (ebr_address != 0)
+		print_extended_partitions(record, filename, ebr_address, i + 1);
+}
+
+/* print_partitions - Prints the partitions on the disk
+ *
+ * Parameters:
+ * 1) struct mbr record	<INPUT>	: The master boot record with the partition table
+ * 2) char *filename	<INPUT> : The name of the img file
+ *
+ * Return: void
+ */
+
+void print_partitions(struct mbr record, char *filename)
+{
+	if (!is_gpt_disk(record))
+		print_mbr_table(record, filename);
+	else
+		printf("\nThe GPT format is not supported yet\n");
+}
+
 int main(int argc, char ** argv)
 {
 	struct mbr m1;
@@ -204,13 +286,12 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	if (get_mbr(argv[1], &m1)) {
+	if (read_mbr(argv[1], &m1)) {
 		return -1;
 	}
 
 	print_overview(m1, argv[1]);
-
-	print_part_table(m1, argv[1]);
+	print_partitions(m1, argv[1]);
 
 	return 0;
 }

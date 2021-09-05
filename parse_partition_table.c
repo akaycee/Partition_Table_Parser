@@ -147,11 +147,12 @@ void print_overview (struct mbr record, char *filename)
  * 1) struct mbr 		<INPUT>  : Master Boot Record structure
  * 2) char *filename		<INPUT>  : Name of the img file
  * 3) long long *ebr_address	<OUTPUT> : The relative address of the next EBR if it exists, 0 otherwise
+ * 4) int partition_number	<INPUT> : The number of the next partition
  * 
  * Return: void
  */
 
-void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset)
+void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset, int partition_number)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
@@ -169,7 +170,7 @@ void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset)
 
 		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
 
-		printf("%s%d  ", filename, 1);
+		printf("%s%d  ", filename, partition_number);
 		printf("%c\t", record.partition_table[0].status? '*':' ' );
 		printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
 		printf("%s\t", size_in_bytes);
@@ -177,14 +178,10 @@ void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset)
 	}
 
 	// Store the offset of the next EBR
-	if(record.partition_table[1].no_sectors == 0)
-	{
+	if (record.partition_table[1].no_sectors == 0)
 		*ebr_offset = 0;
-	}
 	else
-	{
 		*ebr_offset = record.partition_table[1].lba_as * BLK_SIZE;
-	}
 }
 
 /* print_extended_partitions - Prints the partition info all EBR partitions on the disk
@@ -193,11 +190,12 @@ void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset)
  * 1) struct mbr 		<INPUT> : Master Boot Record structure
  * 2) char *filename		<INPUT> : Name of the img file
  * 3) long long ebr_address	<INPUT> : The absolute address of the first EBR table
+ * 4) int partition_number	<INPUT> : The number of the next partition
  * 
  * Return: void
  */
 
-void print_extended_partitions(struct mbr record, char *filename, long long ebr_address)
+void print_extended_partitions(struct mbr record, char *filename, long long ebr_address, int partition_number)
 {
 	unsigned int size = 0;
 	long long ebr_offset = 0;
@@ -212,7 +210,8 @@ void print_extended_partitions(struct mbr record, char *filename, long long ebr_
 			return;
 		}
 
-		print_ebr_table(record, filename, &ebr_offset);
+		print_ebr_table(record, filename, &ebr_offset, partition_number);
+		partition_number += 1;
 	} while (ebr_offset);
 }
 
@@ -229,12 +228,12 @@ void print_mbr_table(struct mbr record, char *filename)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
-	int type = 0;
+	int i, type = 0;
 	long long ebr_address = 0;
 
 	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 	
-	for (int i = 0; i < 4; ++i) {
+	for (i = 0; i < 4; ++i) {
 		sectors = record.partition_table[i].no_sectors;
 		
 		if (0 == sectors)
@@ -258,7 +257,7 @@ void print_mbr_table(struct mbr record, char *filename)
 	}
 
 	if (ebr_address != 0)
-		print_extended_partitions(record, filename, ebr_address);
+		print_extended_partitions(record, filename, ebr_address, i + 1);
 }
 
 /* print_partitions - Prints the partitions on the disk

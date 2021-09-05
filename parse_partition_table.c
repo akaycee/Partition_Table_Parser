@@ -54,8 +54,6 @@ struct mbr {
  * Return: void
  */
 
-FILE *img = NULL;
-
 void sh_bytes (long long t_bytes, char *bytes)
 {
 	double total_bytes = t_bytes;
@@ -80,30 +78,47 @@ void sh_bytes (long long t_bytes, char *bytes)
 	sprintf(bytes, "%.3g%cB", total_bytes, size);
 }
 
+/* open_file - Opens a file from the filename
+ *
+ * Parameters:
+ * 1) char *filename	<INPUT>  : The name of the file
+ * 
+ * Return: NULL if there is an error, a pointer to the opened file otherwise.
+ */
+
+FILE* open_file(char *filename)
+{
+	FILE* file;
+	file = fopen(filename, "r");
+
+	if (file == NULL) {
+		printf("Error Opening %s: %d\n", filename, errno);
+		return NULL;
+	}
+
+	return file;
+}
+
 /* read_mbr - Get the master boot record from the img file
  *
  * Parameters:
- * 1) char *filename	<INPUT> : The name of the img file
- * 2) struct mbr record	<INPUT>	: The master boot record
+ * 1) char *filename	<INPUT>  : The name of the img file
+ * 2) FILE *img			<INPUT>  : A pointer to the img file
+ * 3) struct mbr record	<OUTPUT> : The struct to read the MBR into
  * 
  * Return: -1 if there is an error, 0 otherwise.
  */
 
-int read_mbr(char *filename, struct mbr *record)
+int read_mbr(char *filename, FILE *img, struct mbr *record)
 {
 	unsigned int size = 0;
-	
-	if (NULL == (img = fopen(filename, "r"))) {
-		printf("Error Opening %s: %d", filename, errno);
-		return -1;
-	}
 
 	if ((size = fread(record, 1, sizeof(struct mbr), img)) < 1) {
 		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
 		return -1;
 	}
-	return 0;
 
+	return 0;
 }
 
 int is_gpt_disk(struct mbr record)
@@ -189,13 +204,14 @@ void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset, i
  * Parameters:
  * 1) struct mbr 		<INPUT> : Master Boot Record structure
  * 2) char *filename		<INPUT> : Name of the img file
- * 3) long long ebr_address	<INPUT> : The absolute address of the first EBR table
- * 4) int partition_number	<INPUT> : The number of the next partition
+ * 3) FILE *img				<INPUT> : A pointer to the img file
+ * 4) long long ebr_address	<INPUT> : The absolute address of the first EBR table
+ * 5) int partition_number	<INPUT> : The number of the next partition
  * 
  * Return: void
  */
 
-void print_extended_partitions(struct mbr record, char *filename, long long ebr_address, int partition_number)
+void print_extended_partitions(struct mbr record, char *filename, FILE* img, long long ebr_address, int partition_number)
 {
 	unsigned int size = 0;
 	long long ebr_offset = 0;
@@ -220,11 +236,12 @@ void print_extended_partitions(struct mbr record, char *filename, long long ebr_
  * Parameters:
  * 1) struct mbr 		<INPUT>  : Master Boot Record structure
  * 2) char *filename		<INPUT>  : Name of the img file
+ * 3) FILE *img				<INPUT>  : A pointer to the img file
  * 
  * Return: void
  */
 
-void print_mbr_table(struct mbr record, char *filename)
+void print_mbr_table(struct mbr record, FILE* img, char *filename)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
@@ -257,7 +274,7 @@ void print_mbr_table(struct mbr record, char *filename)
 	}
 
 	if (ebr_address != 0)
-		print_extended_partitions(record, filename, ebr_address, i + 1);
+		print_extended_partitions(record, filename, img, ebr_address, i + 1);
 }
 
 /* print_partitions - Prints the partitions on the disk
@@ -265,20 +282,22 @@ void print_mbr_table(struct mbr record, char *filename)
  * Parameters:
  * 1) struct mbr record	<INPUT>	: The master boot record with the partition table
  * 2) char *filename	<INPUT> : The name of the img file
+ * 2) FILE *img			<INPUT> : A pointer to the img file
  *
  * Return: void
  */
 
-void print_partitions(struct mbr record, char *filename)
+void print_partitions(struct mbr record, FILE* img, char *filename)
 {
 	if (!is_gpt_disk(record))
-		print_mbr_table(record, filename);
+		print_mbr_table(record, img, filename);
 	else
 		printf("\nThe GPT format is not supported yet\n");
 }
 
 int main(int argc, char ** argv)
 {
+	FILE *img = NULL;
 	struct mbr m1;
 
 	if (argc < 2) {
@@ -286,12 +305,16 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	if (read_mbr(argv[1], &m1)) {
+	img = open_file(argv[1]);
+
+	if (img == NULL)
 		return -1;
-	}
+
+	if (read_mbr(argv[1], img, &m1))
+		return -1;
 
 	print_overview(m1, argv[1]);
-	print_partitions(m1, argv[1]);
+	print_partitions(m1, img, argv[1]);
 
 	return 0;
 }

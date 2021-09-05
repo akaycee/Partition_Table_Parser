@@ -212,24 +212,10 @@ void print_part_table (struct mbr record, char *filename)
 
 	print_mbr_table(record, filename, &ebr_address);
 
-	// Print the extended partitions if there are any
-	if (ebr_address)
+	if (ebr_address != 0)
 	{
-		// Go to the absolute address of the first EBR
-		if ((size = fseek(img, ebr_address, SEEK_SET)) < 0) {
-			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
-			return;
-		} else if ((size = fread(&record, 1, sizeof(struct mbr), img)) < 1) {
-			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
-			return;
-		}
-
-		// Print the first EBR
-		print_ebr_table(record, filename, &ebr_offset);
-
-		// Iteratively print the remaining EBRs in the chain
-		while (ebr_offset) {
-			// Go to the absolute address of the first EBR
+		do
+		{
 			if ((size = fseek(img, ebr_address + ebr_offset, SEEK_SET)) < 0) {
 				printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
 				return;
@@ -239,7 +225,7 @@ void print_part_table (struct mbr record, char *filename)
 			}
 
 			print_ebr_table(record, filename, &ebr_offset);
-		}
+		} while (ebr_offset);
 	}
 }
 

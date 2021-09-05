@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
-#include "part_types.h"
+#include "mbr_part_ids.h"
 
 /* Master Boot Record Structure:
  * https://en.wikipedia.org/wiki/Master_boot_record */

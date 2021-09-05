@@ -80,6 +80,32 @@ void sh_bytes (long long t_bytes, char *bytes)
 	sprintf(bytes, "%.3g%cB", total_bytes, size);
 }
 
+/* read_mbr - Get the master boot record from the img file
+ *
+ * Parameters:
+ * 1) char *filename	<INPUT> : The name of the img file
+ * 2) struct mbr record	<INPUT>	: The master boot record
+ * 
+ * Return: -1 if there is an error, 0 otherwise.
+ */
+
+int read_mbr(char *filename, struct mbr *record)
+{
+	unsigned int size = 0;
+	
+	if (NULL == (img = fopen(filename, "r"))) {
+		printf("Error Opening %s: %d", filename, errno);
+		return -1;
+	}
+
+	if ((size = fread(record, 1, sizeof(struct mbr), img)) < 1) {
+		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+		return -1;
+	}
+	return 0;
+
+}
+
 /* print_overview - Prints the number of sectors and total no. of bytes
  *
  * Parameters:
@@ -238,32 +264,6 @@ void print_partitions(struct mbr record, char *filename)
 	print_mbr_table(record, filename);
 }
 
-/* get_mbr - Get the master boot record from the img file
- *
- * Parameters:
- * 1) char *filename	<INPUT> : The name of the img file
- * 2) struct mbr record	<INPUT>	: The master boot record
- * 
- * Return: -1 if there is an error, 0 otherwise.
- */
-
-int get_mbr(char *filename, struct mbr *record)
-{
-	unsigned int size = 0;
-	
-	if (NULL == (img = fopen(filename, "r"))) {
-		printf("Error Opening %s: %d", filename, errno);
-		return -1;
-	}
-
-	if ((size = fread(record, 1, sizeof(struct mbr), img)) < 1) {
-		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
-		return -1;
-	}
-	return 0;
-
-}
-
 int main(int argc, char ** argv)
 {
 	struct mbr m1;
@@ -273,7 +273,7 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	if (get_mbr(argv[1], &m1)) {
+	if (read_mbr(argv[1], &m1)) {
 		return -1;
 	}
 

@@ -148,6 +148,51 @@ void print_mbr_table(struct mbr record, char *filename, long long *ebr_address)
 	}
 }
 
+/* print_ebr_table - Prints the partition info of an EBR
+ *
+ * Parameters:
+ * 1) struct mbr 		<INPUT>  : Master Boot Record structure
+ * 2) char *filename		<INPUT>  : Name of the img file
+ * 3) long long *ebr_address	<OUTPUT> : The relative address of the next EBR if it exists, 0 otherwise
+ * 
+ * Return: void
+ */
+void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset)
+{
+	char size_in_bytes[64];
+	long total_sectors = 0, start = 0, end = 0, sectors = 0;
+	int type = 0;
+
+	sectors = record.partition_table[0].no_sectors;
+	
+	// Print the info of the logical partition
+	if (0 != sectors)
+	{
+		start = record.partition_table[0].lba_as;
+		end = start + sectors - 1;
+		total_sectors += sectors;
+		type = record.partition_table[0].part_type;
+
+		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
+
+		printf("%s%d  ", filename, 1);
+		printf("%c\t", record.partition_table[0].status? '*':' ' );
+		printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
+		printf("%s\t", size_in_bytes);
+		printf("%0x\t%s\n", type, part_type_to_string(type));
+	}
+
+	// Store the offset of the next EBR
+	if(record.partition_table[1].no_sectors == 0)
+	{
+		*ebr_offset = 0;
+	}
+	else
+	{
+		*ebr_offset = record.partition_table[1].lba_as * BLK_SIZE;
+	}
+}
+
 /* print_part_table - Prints the Partition table from the master boot record
  *
  * Parameters:
@@ -160,13 +205,17 @@ void print_mbr_table(struct mbr record, char *filename, long long *ebr_address)
 void print_part_table (struct mbr record, char *filename)
 {
 	long long ebr_address = 0;
+	long long ebr_offset = 0;
 	int size = 0;
 	
 	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 
 	print_mbr_table(record, filename, &ebr_address);
-	
-	while (ebr_address) {
+
+	// Print the extended partitions if there are any
+	if (ebr_address)
+	{
+		// Go to the absolute address of the first EBR
 		if ((size = fseek(img, ebr_address, SEEK_SET)) < 0) {
 			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
 			return;
@@ -174,9 +223,24 @@ void print_part_table (struct mbr record, char *filename)
 			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
 			return;
 		}
-		print_mbr_table(record, filename, &ebr_address);
-	}
 
+		// Print the first EBR
+		print_ebr_table(record, filename, &ebr_offset);
+
+		// Iteratively print the remaining EBRs in the chain
+		while (ebr_offset) {
+			// Go to the absolute address of the first EBR
+			if ((size = fseek(img, ebr_address + ebr_offset, SEEK_SET)) < 0) {
+				printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+				return;
+			} else if ((size = fread(&record, 1, sizeof(struct mbr), img)) < 1) {
+				printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+				return;
+			}
+
+			print_ebr_table(record, filename, &ebr_offset);
+		}
+	}
 }
 
 /* get_mbr - Get the master boot record from the img file

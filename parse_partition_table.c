@@ -105,13 +105,23 @@ void print_overview (struct mbr record, char *filename)
 	printf("Disk identifier: 0x%0x\n", record.bc.dsign);
 }
 
-int print_part_entries(struct mbr record, char *filename, long long *ext_table)
+/* print_mbr_table - Prints the partition info of an MBR
+ *
+ * Parameters:
+ * 1) struct mbr 		<INPUT>  : Master Boot Record structure
+ * 2) char *filename		<INPUT>  : Name of the img file
+ * 3) long long *ebr_address	<OUTPUT> : The absolute address of the next EBR if there is an extended partition, 0 otherwise
+ * 
+ * Return: void
+ */
+
+int print_mbr_table(struct mbr record, char *filename, long long *ebr_address)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
-	int i = 0, type = 0, max_record = (*ext_table ? 2 : 4);
+	int i = 0, type = 0, max_record = (*ebr_address ? 2 : 4);
 	
-	*ext_table = 0;
+	*ebr_address = 0;
 	
 	for (i = 0; i < max_record; ++i) {
 		sectors = record.partition_table[i].no_sectors;
@@ -125,7 +135,7 @@ int print_part_entries(struct mbr record, char *filename, long long *ext_table)
 		type = record.partition_table[i].part_type;
 		
 		if (is_extended(type)) {
-			*ext_table = (start * BLK_SIZE);
+			*ebr_address = (start * BLK_SIZE);
 		}
 
 		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
@@ -149,22 +159,22 @@ int print_part_entries(struct mbr record, char *filename, long long *ext_table)
 
 void print_part_table (struct mbr record, char *filename)
 {
-	long long ext_table = 0;
+	long long ebr_address = 0;
 	int size = 0;
 	
 	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 
-	print_part_entries(record, filename, &ext_table);
+	print_mbr_table(record, filename, &ebr_address);
 	
-	while (ext_table) {
-		if ((size = fseek(img, ext_table, SEEK_SET)) < 0) {
+	while (ebr_address) {
+		if ((size = fseek(img, ebr_address, SEEK_SET)) < 0) {
 			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
 			return;
 		} else if ((size = fread(&record, 1, sizeof(struct mbr), img)) < 1) {
 			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
 			return;
 		}
-		print_part_entries(record, filename, &ext_table);
+		print_mbr_table(record, filename, &ebr_address);
 	}
 
 }

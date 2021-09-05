@@ -12,7 +12,7 @@
 #define MAX_partition_table_RECORDS	4	/* Max partition table entries */
 #define MAX_ETABLE_RECORDS	2	/* Max extended table entries */
 
-struct disk_tstamp {
+struct mbr_timestamp {
 	uint16_t reserve;	/* 0x0000 */
 	uint8_t opd;		/* Original physical drive (0x80–0xFF) */
 	uint8_t sec;		/* Seconds (0–59) */
@@ -20,7 +20,7 @@ struct disk_tstamp {
 	uint8_t hours;		/* Hours (0–23) */
 };
 
-struct partition_entry {
+struct mbr_entry {
 	uint8_t status;		/* Status or physical drive */
 	uint8_t chs_1[3];	/* CHS address of first absolute sector in partition */
 	uint8_t part_type;	/* specifies the file system the partition contains */
@@ -30,17 +30,17 @@ struct partition_entry {
 };
 
 #pragma pack(2)			/* Allign the members of the structures in 1 Byte fields*/
-struct bootstrap_code_area {
+struct mbr_bootstrap {
 	uint8_t bca1[218];			/* Bootstrap code area (part 1) */
-	struct disk_tstamp timestamp;		/* Optional */
+	struct mbr_timestamp timestamp;		/* Optional */
 	uint8_t bca2[216];			/* Bootstrap code area (part 2) (TODO: can be 222, not sure when) */
 	uint32_t dsign;				/* 32-bit disk signature */
 	uint16_t protected;			/* 0x0000 (0x5A5A if copy-protected) */
 };
 
 struct mbr {
-	struct bootstrap_code_area bc;		/* Bootstrap Code area */
-	struct partition_entry partition_table[4];	/* Partition table (for primary partitions) */
+	struct mbr_bootstrap bc;		/* Bootstrap Code area */
+	struct mbr_entry partition_table[4];	/* Partition table (for primary partitions) */
 	uint16_t b_sign;			/* Boot Signature (0x55AA) */
 };
 #pragma pack()
@@ -131,7 +131,7 @@ int is_gpt_disk(struct mbr record)
 	return 0;
 }
 
-/* print_overview - Prints the number of sectors and total no. of bytes
+/* print_mbr_overview - Prints the information of an MBR disk
  *
  * Parameters:
  * 1) struct mbr 	<INPUT> : Master Boot Record Structure
@@ -140,7 +140,7 @@ int is_gpt_disk(struct mbr record)
  * Return: void
  */
 
-void print_overview (struct mbr record, char *filename)
+void print_mbr_overview (struct mbr record, char *filename)
 {
 	long total_sectors = 0;
 	long long total_bytes = 0;
@@ -248,6 +248,7 @@ void print_mbr_table(struct mbr record, FILE* img, char *filename)
 	int i, type = 0;
 	long long ebr_address = 0;
 
+	print_mbr_overview(record, filename);
 	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 	
 	for (i = 0; i < 4; ++i) {
@@ -277,44 +278,39 @@ void print_mbr_table(struct mbr record, FILE* img, char *filename)
 		print_extended_partitions(record, filename, img, ebr_address, i + 1);
 }
 
-/* print_partitions - Prints the partitions on the disk
+/* print_partitions - Prints the partitions of MBR and GPT disks
  *
  * Parameters:
- * 1) struct mbr record	<INPUT>	: The master boot record with the partition table
- * 2) char *filename	<INPUT> : The name of the img file
- * 2) FILE *img			<INPUT> : A pointer to the img file
+ * 1) char *filename	<INPUT> : The name of the img file
  *
- * Return: void
+ * Return: -1 if there is an error, 0 otherwise.
  */
 
-void print_partitions(struct mbr record, FILE* img, char *filename)
+int print_partitions(char *filename)
 {
-	if (!is_gpt_disk(record))
-		print_mbr_table(record, img, filename);
-	else
+	struct mbr m1;
+	FILE *img = open_file(filename);
+
+	if (img == NULL)
+		return -1;
+
+	if (read_mbr(filename, img, &m1))
+		return -1;
+
+	if (is_gpt_disk(m1))
 		printf("\nThe GPT format is not supported yet\n");
+	else
+		print_mbr_table(m1, img, filename);
+
+	return 0;
 }
 
 int main(int argc, char ** argv)
 {
-	FILE *img = NULL;
-	struct mbr m1;
-
 	if (argc < 2) {
 		printf("Usage: %s <path_to_os_img>\n", argv[0]);
 		return -1;
 	}
 
-	img = open_file(argv[1]);
-
-	if (img == NULL)
-		return -1;
-
-	if (read_mbr(argv[1], img, &m1))
-		return -1;
-
-	print_overview(m1, argv[1]);
-	print_partitions(m1, img, argv[1]);
-
-	return 0;
+	return print_partitions(argv[1]);
 }

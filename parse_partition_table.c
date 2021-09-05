@@ -115,7 +115,7 @@ void print_overview (struct mbr record, char *filename)
  * Return: void
  */
 
-int print_mbr_table(struct mbr record, char *filename, long long *ebr_address)
+void print_mbr_table(struct mbr record, char *filename, long long *ebr_address)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;

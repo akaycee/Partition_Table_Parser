@@ -106,6 +106,16 @@ int read_mbr(char *filename, struct mbr *record)
 
 }
 
+int is_gpt_disk(struct mbr record)
+{
+	int part_type = record.partition_table[0].part_type;
+
+	if (is_gpt(part_type))
+		return 1;
+
+	return 0;
+}
+
 /* print_overview - Prints the number of sectors and total no. of bytes
  *
  * Parameters:
@@ -221,6 +231,8 @@ void print_mbr_table(struct mbr record, char *filename)
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
 	int type = 0;
 	long long ebr_address = 0;
+
+	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 	
 	for (int i = 0; i < 4; ++i) {
 		sectors = record.partition_table[i].no_sectors;
@@ -260,8 +272,10 @@ void print_mbr_table(struct mbr record, char *filename)
 
 void print_partitions(struct mbr record, char *filename)
 {
-	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
-	print_mbr_table(record, filename);
+	if (!is_gpt_disk(record))
+		print_mbr_table(record, filename);
+	else
+		printf("\nThe GPT format is not supported yet\n");
 }
 
 int main(int argc, char ** argv)
@@ -278,7 +292,6 @@ int main(int argc, char ** argv)
 	}
 
 	print_overview(m1, argv[1]);
-
 	print_partitions(m1, argv[1]);
 
 	return 0;

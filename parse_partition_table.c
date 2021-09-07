@@ -138,7 +138,7 @@ FILE* open_file(char *filename)
 /* read_mbr - Get the master boot record from the disk image file
  *
  * Parameters:
- * 1) char *filename	<INPUT>  : The name of the img file
+ * 1) char *filename	<INPUT>  : The Name of the disk image file
  * 2) FILE *img		<INPUT>  : A pointer to the img file
  * 3) mbr *record	<OUTPUT> : The struct to read the MBR into
  * 
@@ -161,7 +161,7 @@ int read_mbr(char *filename, FILE *img, mbr *record)
  *
  * Parameters:
  * 1) mbr *record 	<INPUT> : Master Boot Record Structure
- * 2) char *filename	<INPUT> : Name of the img file
+ * 2) char *filename	<INPUT> : Name of the disk image file
  * 
  * Return: void
  */
@@ -186,7 +186,7 @@ void print_mbr_overview (mbr *record, char *filename)
  *
  * Parameters:
  * 1) mbr *record 		<INPUT>  : Master Boot Record structure
- * 2) char *filename		<INPUT>  : Name of the img file
+ * 2) char *filename		<INPUT>  : Name of the disk image file
  * 3) long long *ebr_address	<OUTPUT> : The relative address of the next EBR if it exists, 0 otherwise
  * 4) int partition_number	<INPUT> : The number of the next partition
  * 
@@ -229,7 +229,7 @@ void print_ebr_table(mbr *record, char *filename, long long *ebr_offset, int par
  *
  * Parameters:
  * 1) mbr *record 		<INPUT> : Master Boot Record structure
- * 2) char *filename		<INPUT> : Name of the img file
+ * 2) char *filename		<INPUT> : Name of the disk image file
  * 3) FILE *img			<INPUT> : A pointer to the img file
  * 4) long long ebr_address	<INPUT> : The absolute address of the first EBR table
  * 5) int partition_number	<INPUT> : The number of the next partition
@@ -262,7 +262,7 @@ void print_extended_partitions(mbr *record, char *filename, FILE* img, long long
  *
  * Parameters:
  * 1) mbr_entry *entry 		<INPUT>  : MBR partition entry struct
- * 2) char *filename		<INPUT>  : Name of the img file
+ * 2) char *filename		<INPUT>  : Name of the disk image file
  * 3) int part_num		<INPUT>  : The number of the partition
  * 
  * Return: EBR address if it exists, 0 otherwise
@@ -303,7 +303,7 @@ int  print_mbr_entry(mbr_entry *entry, char *filename, int part_num)
  *
  * Parameters:
  * 1) mbr *record 		<INPUT>  : Master Boot Record struct
- * 2) char *filename		<INPUT>  : Name of the img file
+ * 2) char *filename		<INPUT>  : Name of the disk image file
  * 3) FILE *img			<INPUT>  : A pointer to the img file
  * 
  * Return: void
@@ -332,7 +332,7 @@ void print_mbr_table(mbr *record, char *filename, FILE* img)
 /* read_gpt - Get the GUID partition table from the disk image file
  *
  * Parameters:
- * 1) char *filename	<INPUT>  : The name of the img file
+ * 1) char *filename	<INPUT>  : The Name of the disk image file
  * 2) FILE *img		<INPUT>  : A pointer to the img file
  * 3) gpt* table	<OUTPUT> : The struct to read the GPT into
  * 
@@ -358,24 +358,58 @@ int read_gpt(char *filename, FILE *img, gpt *table)
 	return 0;
 }
 
+/* print_gpt_overview - Prints the information of a GPT disk
+ *
+ * Parameters:
+ * 1) gpt *table 	<INPUT> : GUID Partition Table Structure
+ * 2) char *filename	<INPUT> : Name of the disk image file
+ * 
+ * Return: void
+ */
+
+void print_gpt_overview(gpt *table, char *filename)
+{
+	long total_sectors = 0;
+	long long total_bytes = 0;
+	char size_in_bytes[64];
+	gpt_header *header = &table->header;
+
+	// Initialise total_sector with the starting sector of the first partition
+	total_sectors = header->part_start_lba + ((header->num_parts * header->part_size) / BLK_SIZE);
+
+	for (int i = 0; i < header->num_parts; ++i)
+	{
+		long num_sectors = table->entries[i].last_lba - table->entries[i].first_lba;
+		total_sectors += num_sectors;
+	}
+
+	total_bytes = total_sectors * BLK_SIZE;
+	sh_bytes(total_bytes, size_in_bytes);
+
+	printf("Disk %s: %s, %llu bytes, %lu sectors\n", filename, size_in_bytes, total_bytes, total_sectors);
+	//Print GUID
+}
+
 /* print_gpt_table - Prints the partition info of a GPT
  *
  * Parameters:
  * 1) gpt *table 		<INPUT>  : Master Boot Record structure
- * 2) char *filename		<INPUT>  : Name of the img file
+ * 2) char *filename		<INPUT>  : Name of the disk image file
  * 
  * Return: void
  */
 
 void print_gpt_table(gpt *table, char *filename)
 {
-
+	print_gpt_overview(table, filename);
+	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
+	
 }
 
 /* print_partitions - Prints the partitions of MBR and GPT disks
  *
  * Parameters:
- * 1) char *filename	<INPUT> : The name of the img file
+ * 1) char *filename	<INPUT> : The Name of the disk image file
  *
  * Return: -1 if there is an error, 0 otherwise.
  */

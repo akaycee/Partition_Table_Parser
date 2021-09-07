@@ -309,7 +309,7 @@ int is_extended(int type)
 	}
 }
 
-int is_gpt(int type)
+int is_protective_gpt(int type)
 {
 	if (type == 0xEE)
 		return 1;

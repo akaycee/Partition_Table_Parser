@@ -121,16 +121,6 @@ int read_mbr(char *filename, FILE *img, struct mbr *record)
 	return 0;
 }
 
-int is_gpt_disk(struct mbr record)
-{
-	int part_type = record.partition_table[0].part_type;
-
-	if (is_gpt(part_type))
-		return 1;
-
-	return 0;
-}
-
 /* print_mbr_overview - Prints the information of an MBR disk
  *
  * Parameters:
@@ -297,7 +287,7 @@ int print_partitions(char *filename)
 	if (read_mbr(filename, img, &m1))
 		return -1;
 
-	if (is_gpt_disk(m1))
+	if (is_protective_gpt(m1.partition_table[0].part_type))
 		printf("\nThe GPT format is not supported yet\n");
 	else
 		print_mbr_table(m1, img, filename);

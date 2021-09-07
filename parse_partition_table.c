@@ -135,7 +135,7 @@ FILE* open_file(char *filename)
 	return file;
 }
 
-/* read_mbr - Get the master boot record from the img file
+/* read_mbr - Get the master boot record from the disk image file
  *
  * Parameters:
  * 1) char *filename	<INPUT>  : The name of the img file
@@ -267,7 +267,7 @@ void print_extended_partitions(struct mbr record, char *filename, FILE* img, lon
  * Return: void
  */
 
-void print_mbr_table(struct mbr record, FILE* img, char *filename)
+void print_mbr_table(struct mbr record, char *filename, FILE* img)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
@@ -304,6 +304,35 @@ void print_mbr_table(struct mbr record, FILE* img, char *filename)
 		print_extended_partitions(record, filename, img, ebr_address, i + 1);
 }
 
+/* read_gpt - Get the GUID partition table from the disk image file
+ *
+ * Parameters:
+ * 1) char *filename	<INPUT>  : The name of the img file
+ * 2) FILE *img			<INPUT>  : A pointer to the img file
+ * 3) struct mbr record	<OUTPUT> : The struct to read the GPT into
+ * 
+ * Return: -1 if there is an error, 0 otherwise.
+ */
+
+int read_gpt(char *filename, FILE *img, struct gpt *table)
+{
+	return -1;
+}
+
+/* print_gpt_table - Prints the partition info of a GPT
+ *
+ * Parameters:
+ * 1) struct gpt 		<INPUT>  : Master Boot Record structure
+ * 2) char *filename		<INPUT>  : Name of the img file
+ * 
+ * Return: void
+ */
+
+void print_gpt_table(struct gpt table, char *filename)
+{
+
+}
+
 /* print_partitions - Prints the partitions of MBR and GPT disks
  *
  * Parameters:
@@ -315,6 +344,7 @@ void print_mbr_table(struct mbr record, FILE* img, char *filename)
 int print_partitions(char *filename)
 {
 	struct mbr m1;
+	uint8_t first_part_type;
 	FILE *img = open_file(filename);
 
 	if (img == NULL)
@@ -323,10 +353,18 @@ int print_partitions(char *filename)
 	if (read_mbr(filename, img, &m1))
 		return -1;
 
-	if (is_protective_gpt(m1.partition_table[0].part_type))
-		printf("\nThe GPT format is not supported yet\n");
-	else
-		print_mbr_table(m1, img, filename);
+	first_part_type = m1.partition_table[0].part_type;
+
+	// MBR disk
+	if (!is_protective_gpt(first_part_type)) {
+		print_mbr_table(m1, filename, img);
+	}
+	// GPT disk
+	else {
+		struct gpt g1;
+		read_gpt(filename, img, &g1);
+		print_gpt_table(g1, filename);
+	}
 
 	return 0;
 }

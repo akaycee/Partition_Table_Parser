@@ -63,7 +63,7 @@ struct gpt_header {
 	uint32_t revision;
 	uint32_t header_size;
 	uint32_t header_crc32;
-	uint32_t reserved;
+	uint32_t reserved1;
 	uint64_t current_lba;
 	uint64_t backup_lba;
 	uint64_t first_usable_lba;
@@ -73,12 +73,12 @@ struct gpt_header {
 	uint32_t num_parts;
 	uint32_t part_size;
 	uint32_t part_arr_crc32;
+	uint8_t reserved2[420];
 };
 
 struct gpt {
 	struct gpt_header header;
-	struct gpt_entry* entries;
-
+	struct gpt_entry entries[128];
 };
 
 /* sh_bytes - Converts bytes to Short Hand Notation 
@@ -316,7 +316,21 @@ void print_mbr_table(struct mbr record, char *filename, FILE* img)
 
 int read_gpt(char *filename, FILE *img, struct gpt *table)
 {
-	return -1;
+	unsigned int size = 0;
+
+	// Seek to the Partition Table Header (LBA 1)
+	if ((size = fseek(img, BLK_SIZE, SEEK_SET)) < 0) {
+		printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct gpt));
+		return -1;
+	}
+
+	// Read the header
+	if ((size = fread(table, 1, sizeof(struct gpt), img)) < 1) {
+		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct gpt));
+		return -1;
+	}
+
+	return 0;
 }
 
 /* print_gpt_table - Prints the partition info of a GPT

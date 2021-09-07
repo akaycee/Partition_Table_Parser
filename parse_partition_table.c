@@ -14,51 +14,51 @@
 #define MAX_partition_table_RECORDS	4	/* Max partition table entries */
 #define MAX_ETABLE_RECORDS	2	/* Max extended table entries */
 
-struct mbr_timestamp {
+typedef struct mbr_timestamp {
 	uint16_t reserve;	/* 0x0000 */
 	uint8_t opd;		/* Original physical drive (0x80–0xFF) */
 	uint8_t sec;		/* Seconds (0–59) */
 	uint8_t min;		/* Minutes (0–59) */
 	uint8_t hours;		/* Hours (0–23) */
-};
+} mbr_timestamp;
 
-struct mbr_entry {
+typedef struct mbr_entry {
 	uint8_t status;		/* Status or physical drive */
 	uint8_t chs_1[3];	/* CHS address of first absolute sector in partition */
 	uint8_t part_type;	/* specifies the file system the partition contains */
 	uint8_t chs_2[3];	/* CHS address of last absolute sector in partition */
 	uint32_t lba_as;	/* LBA of first absolute sector in the partition */
 	uint32_t no_sectors;	/* Number of sectors in partition */
-};
+} mbr_entry;
 
 #pragma pack(2)			/* Allign the members of the structures in 1 Byte fields*/
-struct mbr_bootstrap {
+typedef struct mbr_bootstrap {
 	uint8_t bca1[218];			/* Bootstrap code area (part 1) */
 	struct mbr_timestamp timestamp;		/* Optional */
 	uint8_t bca2[216];			/* Bootstrap code area (part 2) (TODO: can be 222, not sure when) */
 	uint32_t dsign;				/* 32-bit disk signature */
 	uint16_t protected;			/* 0x0000 (0x5A5A if copy-protected) */
-};
+} mbr_bootstrap;
 
-struct mbr {
+typedef struct mbr {
 	struct mbr_bootstrap bc;		/* Bootstrap Code area */
 	struct mbr_entry partition_table[4];	/* Partition table (for primary partitions) */
 	uint16_t b_sign;			/* Boot Signature (0x55AA) */
-};
+} mbr;
 #pragma pack()
 
 // Format defined by:
 // https://en.wikipedia.org/wiki/GUID_Partition_Table#Partition_table_header_(LBA_1)
-struct gpt_entry {
+typedef struct gpt_entry {
 	uint8_t part_guid[16];
 	uint8_t unique_guid[16];
 	uint64_t first_lba;
 	uint64_t last_lba;
 	uint64_t flags;
 	uint8_t part_name[72];
-};
+} gpt_entry;
 
-struct gpt_header {
+typedef struct gpt_header {
 	uint64_t signature;
 	uint32_t revision;
 	uint32_t header_size;
@@ -74,12 +74,12 @@ struct gpt_header {
 	uint32_t part_size;
 	uint32_t part_arr_crc32;
 	uint8_t reserved2[420];
-};
+} gpt_header;
 
-struct gpt {
+typedef struct gpt {
 	struct gpt_header header;
 	struct gpt_entry entries[128];
-};
+} gpt;
 
 /* sh_bytes - Converts bytes to Short Hand Notation 
  * 
@@ -145,12 +145,12 @@ FILE* open_file(char *filename)
  * Return: -1 if there is an error, 0 otherwise.
  */
 
-int read_mbr(char *filename, FILE *img, struct mbr *record)
+int read_mbr(char *filename, FILE *img, mbr *record)
 {
 	unsigned int size = 0;
 
-	if ((size = fread(record, 1, sizeof(struct mbr), img)) < 1) {
-		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+	if ((size = fread(record, 1, sizeof(mbr), img)) < 1) {
+		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(mbr));
 		return -1;
 	}
 
@@ -166,7 +166,7 @@ int read_mbr(char *filename, FILE *img, struct mbr *record)
  * Return: void
  */
 
-void print_mbr_overview (struct mbr record, char *filename)
+void print_mbr_overview (mbr record, char *filename)
 {
 	long total_sectors = 0;
 	long long total_bytes = 0;
@@ -193,7 +193,7 @@ void print_mbr_overview (struct mbr record, char *filename)
  * Return: void
  */
 
-void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset, int partition_number)
+void print_ebr_table(mbr record, char *filename, long long *ebr_offset, int partition_number)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
@@ -237,7 +237,7 @@ void print_ebr_table(struct mbr record, char *filename, long long *ebr_offset, i
  * Return: void
  */
 
-void print_extended_partitions(struct mbr record, char *filename, FILE* img, long long ebr_address, int partition_number)
+void print_extended_partitions(mbr record, char *filename, FILE* img, long long ebr_address, int partition_number)
 {
 	unsigned int size = 0;
 	long long ebr_offset = 0;
@@ -245,10 +245,10 @@ void print_extended_partitions(struct mbr record, char *filename, FILE* img, lon
 	do
 	{
 		if ((size = fseek(img, ebr_address + ebr_offset, SEEK_SET)) < 0) {
-			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(mbr));
 			return;
 		} else if ((size = fread(&record, 1, sizeof(struct mbr), img)) < 1) {
-			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct mbr));
+			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(mbr));
 			return;
 		}
 
@@ -267,7 +267,7 @@ void print_extended_partitions(struct mbr record, char *filename, FILE* img, lon
  * Return: void
  */
 
-void print_mbr_table(struct mbr record, char *filename, FILE* img)
+void print_mbr_table(mbr record, char *filename, FILE* img)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
@@ -314,19 +314,19 @@ void print_mbr_table(struct mbr record, char *filename, FILE* img)
  * Return: -1 if there is an error, 0 otherwise.
  */
 
-int read_gpt(char *filename, FILE *img, struct gpt *table)
+int read_gpt(char *filename, FILE *img, gpt *table)
 {
 	unsigned int size = 0;
 
 	// Seek to the Partition Table Header (LBA 1)
 	if ((size = fseek(img, BLK_SIZE, SEEK_SET)) < 0) {
-		printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(struct gpt));
+		printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(gpt));
 		return -1;
 	}
 
 	// Read the header
-	if ((size = fread(table, 1, sizeof(struct gpt), img)) < 1) {
-		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(struct gpt));
+	if ((size = fread(table, 1, sizeof(gpt), img)) < 1) {
+		printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(gpt));
 		return -1;
 	}
 
@@ -342,7 +342,7 @@ int read_gpt(char *filename, FILE *img, struct gpt *table)
  * Return: void
  */
 
-void print_gpt_table(struct gpt table, char *filename)
+void print_gpt_table(gpt table, char *filename)
 {
 
 }
@@ -357,7 +357,7 @@ void print_gpt_table(struct gpt table, char *filename)
 
 int print_partitions(char *filename)
 {
-	struct mbr m1;
+	mbr m1;
 	uint8_t first_part_type;
 	FILE *img = open_file(filename);
 
@@ -375,7 +375,7 @@ int print_partitions(char *filename)
 	}
 	// GPT disk
 	else {
-		struct gpt g1;
+		gpt g1;
 		read_gpt(filename, img, &g1);
 		print_gpt_table(g1, filename);
 	}

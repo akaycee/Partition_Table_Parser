@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include "mbr_part_ids.h"
 

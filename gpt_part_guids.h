@@ -1,5 +1,16 @@
 #define GPT_SIGNATURE_LI 0x5452415020494645	//Little endian signiture
 
+#pragma pack(2)
+typedef struct guid {
+	uint32_t part1;
+	uint16_t part2;
+	uint16_t part3;
+	uint16_t part4;
+	uint32_t part5;
+	uint16_t part6;
+} guid;
+#pragma pack()
+
 bool is_hex(char character)
 {
 	if (character >= '0' && character <= '9')

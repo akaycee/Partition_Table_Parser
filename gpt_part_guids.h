@@ -28,6 +28,8 @@ uint32_t hash_str(char *str)
 	return hash;
 }
 
+// GUIDs copied from:
+// https://en.wikipedia.org/wiki/GUID_Partition_Table
 char* guid_to_string(char* guid)
 {
 	uint32_t hash = hash_str(guid);
@@ -81,7 +83,7 @@ char* guid_to_string(char* guid)
 		case 0x43fa07e3 : 
 			return "Root partition (64-bit ARM/AArch64)";
 		case 0x90e6e9d8 : 
-			return "/boot partition";
+			return "Linux /boot partition | freedesktop.org Shared boot loader configuration";
 		case 0xcbebdc6b : 
 			return "Swap partition";
 		case 0x56c27c7f : 
@@ -117,7 +119,7 @@ char* guid_to_string(char* guid)
 		case 0x8f304aaa : 
 			return "Apple UFS container";
 		case 0xd08be9cc : 
-			return "ZFS";
+			return "Mac ZFS | Solaris illumos /usr partition";
 		case 0x597ce68f : 
 			return "Apple RAID partition";
 		case 0x5a768f24 : 
@@ -138,8 +140,6 @@ char* guid_to_string(char* guid)
 			return "Swap partition";
 		case 0x2255cda2 : 
 			return "Backup partition";
-		case 0xd08be9cc : 
-			return "/usr partition";
 		case 0x1a2fb81d : 
 			return "/var partition";
 		case 0xecb68922 : 
@@ -298,8 +298,6 @@ char* guid_to_string(char* guid)
 			return "Config";
 		case 0xb33a7c1e : 
 			return "PReP boot";
-		case 0x90e6e9d8 : 
-			return "Shared boot loader configuration";
 		case 0x9b8b17fe : 
 			return "Basic data partition (GEM, BGM, F32)";
 		case 0x888903b1 : 

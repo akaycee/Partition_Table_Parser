@@ -47,6 +47,40 @@ struct mbr {
 };
 #pragma pack()
 
+// Format defined by:
+// https://en.wikipedia.org/wiki/GUID_Partition_Table#Partition_table_header_(LBA_1)
+struct gpt_entry {
+	uint8_t part_guid[16];
+	uint8_t unique_guid[16];
+	uint64_t first_lba;
+	uint64_t last_lba;
+	uint64_t flags;
+	uint8_t part_name[72];
+};
+
+struct gpt_header {
+	uint64_t signature;
+	uint32_t revision;
+	uint32_t header_size;
+	uint32_t header_crc32;
+	uint32_t reserved;
+	uint64_t current_lba;
+	uint64_t backup_lba;
+	uint64_t first_usable_lba;
+	uint64_t last_usable_lba;
+	uint8_t disk_guid[16];
+	uint64_t part_start_lba;
+	uint32_t num_parts;
+	uint32_t part_size;
+	uint32_t part_arr_crc32;
+};
+
+struct gpt {
+	struct gpt_header header;
+	struct gpt_entry* entries;
+
+};
+
 /* sh_bytes - Converts bytes to Short Hand Notation 
  * 
  * Parameters:

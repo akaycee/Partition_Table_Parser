@@ -372,6 +372,7 @@ void print_gpt_overview(gpt *table, char *filename)
 	long total_sectors = 0;
 	long long total_bytes = 0;
 	char size_in_bytes[64];
+	char guid[37]; /* Room for 32 hex numbers, 4 dashes, and a null */
 	gpt_header *header = &table->header;
 
 	// Initialise total_sector with the starting sector of the first partition
@@ -385,9 +386,10 @@ void print_gpt_overview(gpt *table, char *filename)
 
 	total_bytes = total_sectors * BLK_SIZE;
 	sh_bytes(total_bytes, size_in_bytes);
+	struct_to_guid(&header->disk_guid, guid);
 
 	printf("Disk %s: %s, %llu bytes, %lu sectors\n", filename, size_in_bytes, total_bytes, total_sectors);
-	//Print GUID
+	printf("Disk identifier: %s\n", guid);
 }
 
 /* print_gpt_table - Prints the partition info of a GPT

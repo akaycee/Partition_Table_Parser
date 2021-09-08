@@ -1,15 +1,15 @@
 #define GPT_SIGNATURE_LI 0x5452415020494645	//Little endian signiture
 
-#pragma pack(2)
 typedef struct guid {
+	// Big Endian
 	uint32_t part1;
 	uint16_t part2;
 	uint16_t part3;
-	uint16_t part4;
-	uint32_t part5;
-	uint16_t part6;
+
+	// Little Endan
+	uint8_t part4[2];
+	uint8_t part5[6];
 } guid;
-#pragma pack()
 
 bool is_hex(char character)
 {
@@ -39,9 +39,37 @@ uint32_t hash_str(char *str)
 	return hash;
 }
 
+/* bytes_to_guid - Converts a byte array to a guid string
+ *
+ * Parameters:
+ * 1) uint8_t *guid_bytes 	<INPUT> : A 16 element array of bytes representing a guid
+ * 2) char *guid		<OUTPUT> : A character array to store the guid string into
+ * 
+ * Return: void
+ */
+
+void struct_to_guid(guid *guid_bytes, char *guid)
+{
+	char* str_ptr = guid;
+
+	// Little Endian
+	str_ptr += sprintf(str_ptr, "%X-", guid_bytes->part1);
+	str_ptr += sprintf(str_ptr, "%X-", guid_bytes->part2);
+	str_ptr += sprintf(str_ptr, "%X-", guid_bytes->part3);
+
+	// Big Endian
+	for (int byte = 0; byte < 2; ++byte)
+		str_ptr += sprintf(str_ptr, "%X", guid_bytes->part4[byte]);
+
+	str_ptr += sprintf(str_ptr, "-");
+
+	for (int byte = 0; byte < 6; ++byte)
+		str_ptr += sprintf(str_ptr, "%X", guid_bytes->part5[byte]);
+}
+
 // GUIDs copied from:
 // https://en.wikipedia.org/wiki/GUID_Partition_Table
-char* guid_to_string(char* guid)
+char* guid_to_type(char* guid)
 {
 	uint32_t hash = hash_str(guid);
 

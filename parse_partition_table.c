@@ -11,7 +11,7 @@
  * https://en.wikipedia.org/wiki/Master_boot_record */
 
 #define BLK_SIZE		512	/* Default value */
-#define MAX_partition_table_RECORDS	4	/* Max partition table entries */
+#define MAX_part_table_RECORDS	4	/* Max partition table entries */
 #define MAX_ETABLE_RECORDS	2	/* Max extended table entries */
 
 typedef struct mbr_timestamp {
@@ -42,13 +42,13 @@ typedef struct mbr_bootstrap {
 
 typedef struct mbr {
 	struct mbr_bootstrap bc;		/* Bootstrap Code area */
-	struct mbr_entry partition_table[4];	/* Partition table (for primary partitions) */
+	struct mbr_entry part_table[4];	/* Partition table (for primary partitions) */
 	uint16_t b_sign;			/* Boot Signature (0x55AA) */
 } mbr;
 #pragma pack()
 
 // Format defined by:
-// https://en.wikipedia.org/wiki/GUID_Partition_Table#Partition_table_header_(LBA_1)
+// https://en.wikipedia.org/wiki/GUID_part_table#part_table_header_(LBA_1)
 typedef struct gpt_entry {
 	guid part_guid;
 	guid unique_guid;
@@ -78,7 +78,7 @@ typedef struct gpt_header {
 
 typedef struct gpt {
 	struct gpt_header header;
-	struct gpt_entry entries[128];
+	struct gpt_entry part_table[128];
 } gpt;
 
 /* sh_bytes - Converts bytes to Short Hand Notation 
@@ -173,8 +173,8 @@ void print_mbr_overview (mbr *record, char *filename)
 	char size_in_bytes[64];
 	int i = 0;
 
-	total_sectors = record->partition_table[0].lba_as;				/* Initialise total_sector with the first absolute sector */
-	for (i = 0; i < 4; ++i) total_sectors +=  record->partition_table[i].no_sectors;
+	total_sectors = record->part_table[0].lba_as;				/* Initialise total_sector with the first absolute sector */
+	for (i = 0; i < 4; ++i) total_sectors +=  record->part_table[i].no_sectors;
 	total_bytes = total_sectors * BLK_SIZE;
 	sh_bytes(total_bytes, size_in_bytes);
 
@@ -199,30 +199,30 @@ void print_ebr_table(mbr *record, char *filename, long long *ebr_offset, int par
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
 	int type = 0;
 
-	sectors = record->partition_table[0].no_sectors;
+	sectors = record->part_table[0].no_sectors;
 	
 	// Print the info of the logical partition
 	if (0 != sectors)
 	{
-		start = record->partition_table[0].lba_as;
+		start = record->part_table[0].lba_as;
 		end = start + sectors - 1;
 		total_sectors += sectors;
-		type = record->partition_table[0].part_type;
+		type = record->part_table[0].part_type;
 
 		sh_bytes((sectors * BLK_SIZE), size_in_bytes);
 
 		printf("%s%d  ", filename, partition_number);
-		printf("%c\t", record->partition_table[0].status? '*':' ' );
+		printf("%c\t", record->part_table[0].status? '*':' ' );
 		printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
 		printf("%s\t", size_in_bytes);
 		printf("%0x\t%s\n", type, part_type_to_string(type));
 	}
 
 	// Store the offset of the next EBR
-	if (record->partition_table[1].no_sectors == 0)
+	if (record->part_table[1].no_sectors == 0)
 		*ebr_offset = 0;
 	else
-		*ebr_offset = record->partition_table[1].lba_as * BLK_SIZE;
+		*ebr_offset = record->part_table[1].lba_as * BLK_SIZE;
 }
 
 /* print_extended_partitions - Prints the partition info all EBR partitions on the disk
@@ -258,7 +258,7 @@ void print_extended_partitions(mbr *record, char *filename, FILE* img, long long
 }
 
 
-/* print_mbr_table - Prints the partition info of an MBR entry
+/* print_mbr_entry - Prints the partition info of an MBR entry
  *
  * Parameters:
  * 1) mbr_entry *entry 		<INPUT>  : MBR partition entry struct
@@ -268,7 +268,7 @@ void print_extended_partitions(mbr *record, char *filename, FILE* img, long long
  * Return: EBR address if it exists, 0 otherwise
  */
 
-int  print_mbr_entry(mbr_entry *entry, char *filename, int part_num)
+int print_mbr_entry(mbr_entry *entry, char *filename, int part_num)
 {
 	long long ebr_address = 0;
 	char size_in_bytes[64];
@@ -318,7 +318,7 @@ void print_mbr_table(mbr *record, char *filename, FILE* img)
 	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 	
 	for (i = 0; i < 4; ++i) {
-		mbr_entry *entry = &(record->partition_table[i]);
+		mbr_entry *entry = &(record->part_table[i]);
 		long long result = print_mbr_entry(entry, filename, i + 1);
 
 		if (result != 0)
@@ -380,7 +380,7 @@ void print_gpt_overview(gpt *table, char *filename)
 
 	for (int i = 0; i < header->num_parts; ++i)
 	{
-		long num_sectors = table->entries[i].last_lba - table->entries[i].first_lba;
+		long num_sectors = table->part_table[i].last_lba - table->part_table[i].first_lba;
 		total_sectors += num_sectors;
 	}
 
@@ -390,6 +390,24 @@ void print_gpt_overview(gpt *table, char *filename)
 
 	printf("Disk %s: %s, %llu bytes, %lu sectors\n", filename, size_in_bytes, total_bytes, total_sectors);
 	printf("Disk identifier: %s\n", guid);
+}
+
+/* print_gpt_entry - Prints the partition info of a GPT entry
+ *
+ * Parameters:
+ * 1) gpt_entry *entry 		<INPUT>  : GPT partition entry struct
+ * 2) char *filename		<INPUT>  : Name of the disk image file
+ * 3) int part_num		<INPUT>  : The number of the partition
+ * 
+ * Return: void
+ */
+
+void print_gpt_entry(gpt_entry *entry, char *filename, int part_num)
+{
+	char guid[37]; /* Room for 32 hex numbers, 4 dashes, and a null */
+	struct_to_guid(&entry->part_guid, guid);
+
+	printf("%s\n", guid);
 }
 
 /* print_gpt_table - Prints the partition info of a GPT
@@ -403,9 +421,17 @@ void print_gpt_overview(gpt *table, char *filename)
 
 void print_gpt_table(gpt *table, char *filename)
 {
+	gpt_entry *entry;
+
 	print_gpt_overview(table, filename);
 	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 	
+	for (int i = 0; i < table->header.num_parts; ++i) {
+		entry = &(table->part_table[i]);
+
+		if (!is_unused_part(&entry->part_guid))
+			print_gpt_entry(entry, filename, i + 1);
+	}
 }
 
 /* print_partitions - Prints the partitions of MBR and GPT disks
@@ -428,7 +454,7 @@ int print_partitions(char *filename)
 	if (read_mbr(filename, img, &m1))
 		return -1;
 
-	first_part_type = m1.partition_table[0].part_type;
+	first_part_type = m1.part_table[0].part_type;
 
 	// MBR disk
 	if (!is_protective_gpt(first_part_type)) {

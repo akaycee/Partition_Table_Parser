@@ -23,6 +23,28 @@ bool is_hex(char character)
 		return false;
 }
 
+bool is_unused_part(guid *guid_bytes)
+{
+	if (guid_bytes->part1 != 0x0000)
+		return false;
+	else if (guid_bytes->part2 != 0x00)
+		return false;
+	else if (guid_bytes->part3 != 0x00)
+		return false;
+
+	for (int byte = 0; byte < 2; ++byte) {
+		if (guid_bytes->part4[byte] != 0x0)
+			return false;
+	}
+
+	for (int byte = 0; byte < 6; ++byte) {
+		if (guid_bytes->part4[byte] != 0x0)
+			return false;
+	}
+
+	return true;
+}
+
 // djb2 Hashing Algorithm
 // Copied from: http://www.cse.yorku.ca/~oz/hash.html
 uint32_t hash_str(char *str)

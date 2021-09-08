@@ -75,9 +75,9 @@ void struct_to_guid(guid *guid_bytes, char *guid)
 	char* str_ptr = guid;
 
 	// Little Endian
-	str_ptr += sprintf(str_ptr, "%X-", guid_bytes->part1);
-	str_ptr += sprintf(str_ptr, "%X-", guid_bytes->part2);
-	str_ptr += sprintf(str_ptr, "%X-", guid_bytes->part3);
+	str_ptr += sprintf(str_ptr, "%08X-", guid_bytes->part1);
+	str_ptr += sprintf(str_ptr, "%04X-", guid_bytes->part2);
+	str_ptr += sprintf(str_ptr, "%04X-", guid_bytes->part3);
 
 	// Big Endian
 	for (int byte = 0; byte < 2; ++byte)

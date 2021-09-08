@@ -404,8 +404,20 @@ void print_gpt_overview(gpt *table, char *filename)
 
 void print_gpt_entry(gpt_entry *entry, char *filename, int part_num)
 {
+	char size_in_bytes[64];
 	char guid[37]; /* Room for 32 hex numbers, 4 dashes, and a null */
+
+	long start = entry->first_lba;
+	long end = entry->last_lba;
+	long sectors = end - start + 1;
+
+	sh_bytes((sectors * BLK_SIZE), size_in_bytes);
 	struct_to_guid(&entry->part_guid, guid);
+
+	printf("%s%d  ", filename, part_num);
+	printf("%lu\t%lu\t%lu\t\t", start, end, sectors);
+	printf("%s\t", size_in_bytes);
+	printf("%s\n", guid_to_type(guid));
 
 	printf("%s\n", guid);
 }
@@ -424,7 +436,7 @@ void print_gpt_table(gpt *table, char *filename)
 	gpt_entry *entry;
 
 	print_gpt_overview(table, filename);
-	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
+	printf("\nDevice\tStart\tEnd\tSectors\t\tSize\tType\n");
 	
 	for (int i = 0; i < table->header.num_parts; ++i) {
 		entry = &(table->part_table[i]);

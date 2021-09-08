@@ -81,17 +81,17 @@ void struct_to_guid(guid *guid_bytes, char *guid)
 
 	// Big Endian
 	for (int byte = 0; byte < 2; ++byte)
-		str_ptr += sprintf(str_ptr, "%X", guid_bytes->part4[byte]);
+		str_ptr += sprintf(str_ptr, "%02X", guid_bytes->part4[byte]);
 
 	str_ptr += sprintf(str_ptr, "-");
 
 	for (int byte = 0; byte < 6; ++byte)
-		str_ptr += sprintf(str_ptr, "%X", guid_bytes->part5[byte]);
+		str_ptr += sprintf(str_ptr, "%02X", guid_bytes->part5[byte]);
 }
 
 // GUIDs copied from:
 // https://en.wikipedia.org/wiki/GUID_Partition_Table
-char* guid_to_type(char* guid)
+const char* guid_to_type(char* guid)
 {
 	uint32_t hash = hash_str(guid);
 

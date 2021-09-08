@@ -293,7 +293,7 @@ char* part_type_to_string(int type)
 	}
 }
 
-int is_extended(int type)
+bool is_extended(int type)
 {
 	switch (type) {
 		case 0xD5 : 
@@ -303,16 +303,16 @@ int is_extended(int type)
 		case 0xCF : 
 		case 0xE1 : 
 		case 0xE4 :
-		       return 1;
+		       return true;
 		default:
-			return 0;
+			return false;
 	}
 }
 
-int is_gpt(int type)
+bool is_protective_gpt(int type)
 {
 	if (type == 0xEE)
-		return 1;
+		return true;
 
-	return 0;
+	return false;
 }

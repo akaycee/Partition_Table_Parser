@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
+
 #include "mbr_part_ids.h"
 #include "gpt_part_guids.h"
 
@@ -31,7 +33,7 @@ typedef struct mbr_entry {
 	uint32_t no_sectors;	/* Number of sectors in partition */
 } mbr_entry;
 
-#pragma pack(2)			/* Allign the members of the structures in 1 Byte fields*/
+#pragma pack(2)			/* Allign the members of the structures in 2 Byte fields*/
 typedef struct mbr_bootstrap {
 	uint8_t bca1[218];			/* Bootstrap code area (part 1) */
 	struct mbr_timestamp timestamp;		/* Optional */
@@ -187,13 +189,14 @@ void print_mbr_overview (mbr *record, char *filename)
  * Parameters:
  * 1) mbr *record 		<INPUT>  : Master Boot Record structure
  * 2) char *filename		<INPUT>  : Name of the disk image file
- * 3) long long *ebr_address	<OUTPUT> : The relative address of the next EBR if it exists, 0 otherwise
- * 4) int partition_number	<INPUT> : The number of the next partition
+ * 3) long long *ebr_block	<OUTPUT> : The sector of the EBR block
+ * 4) long long *ebr_offset	<OUTPUT> : The relative address of the next EBR if it exists, 0 otherwise
+ * 5) int partition_number	<INPUT>  : The number of the next partition
  * 
  * Return: void
  */
 
-void print_ebr_table(mbr *record, char *filename, long long *ebr_offset, int partition_number)
+void print_ebr_table(mbr *record, char *filename, long long ebr_block, long long *ebr_offset, int partition_number)
 {
 	char size_in_bytes[64];
 	long total_sectors = 0, start = 0, end = 0, sectors = 0;
@@ -204,7 +207,7 @@ void print_ebr_table(mbr *record, char *filename, long long *ebr_offset, int par
 	// Print the info of the logical partition
 	if (0 != sectors)
 	{
-		start = record->part_table[0].lba_as;
+		start = record->part_table[0].lba_as + ebr_block;
 		end = start + sectors - 1;
 		total_sectors += sectors;
 		type = record->part_table[0].part_type;
@@ -240,19 +243,17 @@ void print_ebr_table(mbr *record, char *filename, long long *ebr_offset, int par
 void print_extended_partitions(mbr *record, char *filename, FILE* img, long long ebr_address, int partition_number)
 {
 	unsigned int size = 0;
-	long long ebr_offset = 0;
+	long long ebr_offset = 0, ebr_block = 0;
 
 	do
 	{
-		if ((size = fseek(img, ebr_address + ebr_offset, SEEK_SET)) < 0) {
-			printf("Error seeking file %s! [%d] size = %lu\n", filename, size, sizeof(mbr));
-			return;
-		} else if ((size = fread(record, 1, sizeof(struct mbr), img)) < 1) {
+		if ((size = pread(fileno(img), record, sizeof(struct mbr), ebr_address + ebr_offset)) < 0) {
 			printf("Error reading from %s! [%d] size = %lu\n", filename, size, sizeof(mbr));
 			return;
 		}
 
-		print_ebr_table(record, filename, &ebr_offset, partition_number);
+		ebr_block = ( ebr_address + ebr_offset ) / BLK_SIZE;
+		print_ebr_table(record, filename, ebr_block , &ebr_offset, partition_number);
 		partition_number += 1;
 	} while (ebr_offset);
 }
@@ -312,14 +313,14 @@ int print_mbr_entry(mbr_entry *entry, char *filename, int part_num)
 void print_mbr_table(mbr *record, char *filename, FILE* img)
 {
 	int i = 0;
-	long long ebr_address = 0;
+	long long ebr_address = 0, result = 0;
 
 	print_mbr_overview(record, filename);
+	
 	printf("\nDevice%*s\tStart\tEnd\tSectors\t\tSize\tID\tType\n", (int) strlen(filename), "Boot");
 	
 	for (i = 0; i < 4; ++i) {
-		mbr_entry *entry = &(record->part_table[i]);
-		long long result = print_mbr_entry(entry, filename, i + 1);
+		result = print_mbr_entry(&(record->part_table[i]), filename, i + 1);
 
 		if (result != 0)
 			ebr_address = result;

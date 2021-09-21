@@ -182,6 +182,8 @@ char* part_type_to_string(int type)
 			return "NetBSD";
 		case 0xAA : 
 			return "Olivetti DOS with FAT12";
+		case 0xAF : 
+			return "HFS and HFS+";	/* https://en.wikipedia.org/wiki/Partition_type */
 		case 0xB0 : 
 			return "Bootmanager BootStar by Star-Tools GmbH";
 		case 0xB1 : 

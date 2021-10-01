@@ -1,6 +1,6 @@
 # Storage Research
 
-## Partition Table Parser
+## MBR & GPT Partition Table Parser
 
 Build using "make"
 
